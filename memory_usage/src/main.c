@@ -36,35 +36,58 @@ static bool module_reader_cb(const char *module_name, uint8 **p_buffer, uint32 *
 
 int main()
 {
-    char error_buf[128];
+    static char global_heap_buf[512 * 1024];
+
+    RuntimeInitArgs init_args;
+    memset(&init_args, 0, sizeof(RuntimeInitArgs));
+
+    init_args.mem_alloc_type = Alloc_With_Pool;
+    init_args.mem_alloc_option.pool.heap_buf = global_heap_buf;
+    init_args.mem_alloc_option.pool.heap_size = sizeof(global_heap_buf);
+
+    if (!wasm_runtime_full_init(&init_args))
+    {
+        printf("Init runtime environment failed.\n");
+        return -1;
+    }
+
+    uint8 *buffer = NULL;
+    uint32 buffer_size = 0;
+    if (!module_reader_cb("mA", &buffer, &buffer_size))
+    {
+        return -1;
+    }
+
     wasm_module_t module = NULL;
-    wasm_module_inst_t module_inst;
-    wasm_function_inst_t func;
-    wasm_exec_env_t exec_env;
-    uint32 size, stack_size = 8092, heap_size = 8092;
-
-    /* initialize the wasm runtime by default configurations */
-    wasm_runtime_init();
-
-    /* read WASM file into a memory buffer */
-    uint8 *file_buf = NULL;
-    uint32 file_buf_size = 0;
-
-    if (!module_reader_cb("mA", &file_buf, &file_buf_size))
+    char error_buffer[128];
+    module = wasm_runtime_load(buffer, buffer_size, error_buffer, sizeof(error_buffer));
+    if (!module)
     {
+        printf("Load wasm module failed. error: %s\n", error_buffer);
         return -1;
     }
 
-    /* add line below if we want to export native functions to WASM app */
-    // wasm_runtime_register_natives(...);
-
-    /* parse the WASM file from buffer and create a WASM module */
-    if (!(module = wasm_runtime_load(file_buf, file_buf_size, error_buf, sizeof(error_buf))))
+    uint32 stack_size = 8092, heap_size = 8092;
+    wasm_module_inst_t module_inst = wasm_runtime_instantiate(module, stack_size, heap_size, error_buffer, sizeof(error_buffer));
+    if (!module_inst)
     {
-        printf("%s\n", error_buf);
+        printf("Instantiate wasm module failed. error: %s\n", error_buffer);
         return -1;
     }
-    /* create an instance of the WASM module (WASM linear memory is ready) */
-    module_inst = wasm_runtime_instantiate(module, stack_size, heap_size,
-                                           error_buf, sizeof(error_buf));
+
+    wasm_exec_env_t exec_env = wasm_runtime_create_exec_env(module_inst, stack_size);
+    if (!exec_env)
+    {
+        printf("Create wasm execution environment failed.\n");
+        return -1;
+    }
+
+    wasm_function_inst_t func = NULL;
+    if (!(func = wasm_runtime_lookup_function(module_inst, "A1", NULL)))
+    {
+        printf("The generate_float wasm function is not found.\n");
+        return -1;
+    }
+
+    return 0;
 }

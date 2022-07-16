@@ -89,5 +89,19 @@ int main()
         return -1;
     }
 
+    wasm_val_t results[1] = {{.kind = WASM_I32, .of.i32 = 0}};
+    wasm_val_t arguments[0] = {};
+    if (!wasm_runtime_call_wasm_a(exec_env, func, 1, results, 0, arguments))
+    {
+        printf("call wasm function A1 failed. %s\n", wasm_runtime_get_exception(module_inst));
+        return -1;
+    }
+
+    int ret_val;
+    ret_val = results[0].of.i32;
+    printf("Native finished calling wasm function generate_float(), returned a "
+           "float value: %d\n",
+           ret_val);
+
     return 0;
 }

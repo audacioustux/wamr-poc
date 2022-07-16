@@ -5,8 +5,7 @@
 #include "platform_common.h"
 #include "wasm_export.h"
 
-static char *
-build_module_path(const char *module_name)
+static char *build_module_path(const char *module_name)
 {
     const char *module_search_path = ".";
     const char *format = "%s/%s.wasm";
@@ -21,8 +20,7 @@ build_module_path(const char *module_name)
     return wasm_file_name;
 }
 
-static bool
-module_reader_cb(const char *module_name, uint8 **p_buffer, uint32 *p_size)
+static bool module_reader_cb(const char *module_name, uint8 **p_buffer, uint32 *p_size)
 {
     char *wasm_file_path = build_module_path(module_name);
     if (!wasm_file_path)
@@ -36,124 +34,37 @@ module_reader_cb(const char *module_name, uint8 **p_buffer, uint32 *p_size)
     return *p_buffer != NULL;
 }
 
-static void
-module_destroyer_cb(uint8 *buffer, uint32 size)
-{
-    printf("- release the read file buffer\n");
-    if (!buffer)
-    {
-        return;
-    }
-
-    BH_FREE(buffer);
-    buffer = NULL;
-}
-
-/* 10M */
-static char sandbox_memory_space[10 * 1024 * 1024] = {0};
 int main()
 {
-    bool ret = false;
-    /* 16K */
-    const uint32 stack_size = 16 * 1024;
-    const uint32 heap_size = 16 * 1024;
+    char error_buf[128];
+    wasm_module_t module = NULL;
+    wasm_module_inst_t module_inst;
+    wasm_function_inst_t func;
+    wasm_exec_env_t exec_env;
+    uint32 size, stack_size = 8092, heap_size = 8092;
 
-    RuntimeInitArgs init_args = {0};
-    char error_buf[128] = {0};
-    /* parameters and return values */
-    char *args[1] = {0};
+    /* initialize the wasm runtime by default configurations */
+    wasm_runtime_init();
 
+    /* read WASM file into a memory buffer */
     uint8 *file_buf = NULL;
     uint32 file_buf_size = 0;
-    wasm_module_t module = NULL;
-    wasm_module_inst_t module_inst = NULL;
 
-    /* all malloc() only from the given buffer */
-    init_args.mem_alloc_type = Alloc_With_Pool;
-    init_args.mem_alloc_option.pool.heap_buf = sandbox_memory_space;
-    init_args.mem_alloc_option.pool.heap_size = sizeof(sandbox_memory_space);
-
-    printf("- wasm_runtime_full_init\n");
-    /* initialize runtime environment */
-    if (!wasm_runtime_full_init(&init_args))
+    if (!module_reader_cb("mA", &file_buf, &file_buf_size))
     {
-        printf("Init runtime environment failed.\n");
-        goto EXIT;
+        return -1;
     }
 
-#if WASM_ENABLE_MULTI_MODULE != 0
-    printf("- wasm_runtime_set_module_reader\n");
-    /* set module reader and destroyer */
-    wasm_runtime_set_module_reader(module_reader_cb, module_destroyer_cb);
-#endif
+    /* add line below if we want to export native functions to WASM app */
+    // wasm_runtime_register_natives(...);
 
-    /* load WASM byte buffer from WASM bin file */
-    if (!module_reader_cb("mC", &file_buf, &file_buf_size))
-    {
-        goto RELEASE_RUNTIME;
-    }
-
-    /* load mC and let WAMR load mA and mB */
-    printf("- wasm_runtime_load\n");
-    if (!(module = wasm_runtime_load(file_buf, file_buf_size, error_buf,
-                                     sizeof(error_buf))))
+    /* parse the WASM file from buffer and create a WASM module */
+    if (!(module = wasm_runtime_load(file_buf, file_buf_size, error_buf, sizeof(error_buf))))
     {
         printf("%s\n", error_buf);
-        goto RELEASE_BINARY;
+        return -1;
     }
-
-    /* instantiate the module */
-    printf("- wasm_runtime_instantiate\n");
-    if (!(module_inst = wasm_runtime_instantiate(
-              module, stack_size, heap_size, error_buf, sizeof(error_buf))))
-    {
-        printf("%s\n", error_buf);
-        goto UNLOAD_MODULE;
-    }
-
-    /* call functions of mC */
-    printf("\n----------------------------------------\n");
-    printf("call \"C1\", it will return 0x1f:i32, ===> ");
-    wasm_application_execute_func(module_inst, "C1", 0, args);
-    printf("call \"C2\", it will call B1() of mB and return 0x15:i32, ===> ");
-    wasm_application_execute_func(module_inst, "C2", 0, args);
-    printf("call \"C3\", it will call A1() of mA and return 0xb:i32, ===> ");
-    wasm_application_execute_func(module_inst, "C3", 0, args);
-    printf("call \"C4\", it will call B2() of mB and call A1() of mA and "
-           "return 0xb:i32, ===> ");
-    wasm_application_execute_func(module_inst, "C4", 0, args);
-    printf(
-        "call \"C5\", it will be failed since it is a export function, ===> ");
-    wasm_application_execute_func(module_inst, "C5", 0, args);
-
-    /* call functions of mB */
-    printf("call \"mB.B1\", it will return 0x15:i32, ===> ");
-    wasm_application_execute_func(module_inst, "$mB$B1", 0, args);
-    printf("call \"mB.B2\", it will call A1() of mA and return 0xb:i32, ===> ");
-    wasm_application_execute_func(module_inst, "$mB$B2", 0, args);
-    printf("call \"mB.B3\", it will be failed since it is a export function, "
-           "===> ");
-    wasm_application_execute_func(module_inst, "$mB$B3", 0, args);
-
-    /* call functions of mA */
-    printf("call \"mA.A1\", it will return 0xb:i32, ===>");
-    wasm_application_execute_func(module_inst, "$mA$A1", 0, args);
-    printf("call \"mA.A2\", it will be failed since it is a export function, "
-           "===> ");
-    wasm_application_execute_func(module_inst, "$mA$A2", 0, args);
-    printf("----------------------------------------\n\n");
-    ret = true;
-
-    printf("- wasm_runtime_deinstantiate\n");
-    wasm_runtime_deinstantiate(module_inst);
-UNLOAD_MODULE:
-    printf("- wasm_runtime_unload\n");
-    wasm_runtime_unload(module);
-RELEASE_BINARY:
-    module_destroyer_cb(file_buf, file_buf_size);
-RELEASE_RUNTIME:
-    printf("- wasm_runtime_destroy\n");
-    wasm_runtime_destroy();
-EXIT:
-    return ret ? 0 : 1;
+    /* create an instance of the WASM module (WASM linear memory is ready) */
+    module_inst = wasm_runtime_instantiate(module, stack_size, heap_size,
+                                           error_buf, sizeof(error_buf));
 }

@@ -81,4 +81,4 @@ function(COMPILE_WITH_CLANG SOURCE_FILE COMMAND)
   endif()
 endfunction()
 
-compile_with_clang(hello-world.c ON)
+compile_with_clang(hello-world.c OFF)

@@ -81,9 +81,4 @@ function(COMPILE_WITH_CLANG SOURCE_FILE COMMAND)
   endif()
 endfunction()
 
-compile_with_clang(mA.c OFF)
-compile_with_clang(mB.c OFF)
-compile_with_clang(mC.c ON)
-compile_with_clang(mD.cpp ON)
-compile_with_clang(mE.cpp OFF)
-
+compile_with_clang(hello-world.c ON)

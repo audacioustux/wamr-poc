@@ -42,13 +42,13 @@ if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE Release)
 endif ()
 
-set(WAMR_BUILD_INTERP 1)
+# set(WAMR_BUILD_INTERP 1)
 # set(WAMR_BUILD_FAST_INTERP 1)
-set(WAMR_BUILD_AOT 0)
-set(WAMR_BUILD_JIT 0)
+set(WAMR_BUILD_AOT 1)
+# set(WAMR_BUILD_JIT 1)
 set(WAMR_BUILD_LIBC_BUILTIN 1)
 set(WAMR_BUILD_LIBC_WASI 1)
-set(WAMR_BUILD_MULTI_MODULE 1)
+# set(WAMR_BUILD_MULTI_MODULE 1)
 # set(WAMR_BUILD_SIMD 1)
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pie -fPIE")
@@ -123,6 +123,21 @@ else()
   message(STATUS "WASI_SDK_DIR is ${WASI_SDK_DIR}")
   message(STATUS "WASI_TOOLCHAIN_FILE is ${WASI_TOOLCHAIN_FILE}")
   message(STATUS "WASI_SYS_ROOT is ${WASI_SYS_ROOT}")
+endif()
+
+message(CHECK_START "Detecting WAMRC in ${WAMR_ROOT_DIR}/wamr-compiler/build/")
+if(${WAMR_BUILD_AOT} EQUAL 1)
+  ## locate wamrc
+  find_program(WAMRC
+    wamrc
+    PATHS ${WAMR_ROOT_DIR}/wamr-compiler/build/
+  )
+
+  if(NOT WAMRC)
+    message(SEND_ERROR "can not find wamrc.  refer to \
+        https://github.com/bytecodealliance/wasm-micro-runtime#build-wamrc-aot-compiler"
+    )
+  endif()
 endif()
 
 ### .c -> .wasm

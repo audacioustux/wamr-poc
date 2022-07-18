@@ -8,7 +8,7 @@
 static char *build_module_path(const char *module_name)
 {
     const char *module_search_path = ".";
-    const char *format = "%s/%s.wasm";
+    const char *format = "%s/%s.aot";
     int sz = strlen(module_search_path) + strlen("/") + strlen(module_name) + strlen(".wasm") + 1;
     char *wasm_file_name = BH_MALLOC(sz);
     if (!wasm_file_name)
@@ -36,16 +36,17 @@ static bool module_reader_cb(const char *module_name, uint8 **p_buffer, uint32 *
 
 int main()
 {
-    static char global_heap_buf[1024 * 1024 * 1024];
+    // static char global_heap_buf[1024 * 1024 * 1024];
 
-    RuntimeInitArgs init_args;
-    memset(&init_args, 0, sizeof(RuntimeInitArgs));
+    // RuntimeInitArgs init_args;
+    // memset(&init_args, 0, sizeof(RuntimeInitArgs));
 
-    init_args.mem_alloc_type = Alloc_With_Pool;
-    init_args.mem_alloc_option.pool.heap_buf = global_heap_buf;
-    init_args.mem_alloc_option.pool.heap_size = sizeof(global_heap_buf);
+    // init_args.mem_alloc_type = Alloc_With_Pool;
+    // init_args.mem_alloc_option.pool.heap_buf = global_heap_buf;
+    // init_args.mem_alloc_option.pool.heap_size = sizeof(global_heap_buf);
 
-    if (!wasm_runtime_full_init(&init_args))
+    // if (!wasm_runtime_full_init(&init_args))
+    if (!wasm_runtime_init())
     {
         printf("Init runtime environment failed.\n");
         return -1;
@@ -67,9 +68,9 @@ int main()
         return -1;
     }
 
-    for (int i = 0; i < 1; i++)
+    for (int i = 0; i < 10000; i++)
     {
-        const uint32 stack_size = 512, heap_size = 64;
+        const uint32 stack_size = 512, heap_size = 256;
         wasm_module_inst_t module_inst = wasm_runtime_instantiate(module, stack_size, heap_size, error_buffer, sizeof(error_buffer));
         if (!module_inst)
         {
@@ -88,26 +89,28 @@ int main()
         // static char **app_argv;
         // wasm_application_execute_main(module_inst, app_argc, app_argv);
 
-        wasm_function_inst_t func = NULL;
-        if (!(func = wasm_runtime_lookup_function(module_inst, "dummy", NULL)))
-        {
-            printf("The generate_float wasm function is not found.\n");
-            return -1;
-        }
+        // wasm_function_inst_t func = wasm_runtime_lookup_function(module_inst, "dummy", NULL);
+        // if (!func)
+        // {
+        // printf("The generate_float wasm function is not found.\n");
+        // return -1;
+        // }
 
-        wasm_val_t results[1] = {{.kind = WASM_I32, .of.i32 = 0}};
-        wasm_val_t arguments[0] = {};
-        if (!wasm_runtime_call_wasm_a(exec_env, func, 1, results, 0, arguments))
-        {
-            printf("call wasm function A1 failed. %s\n", wasm_runtime_get_exception(module_inst));
-            return -1;
-        }
+        // wasm_val_t results[1] = {{.kind = WASM_I32, .of.i32 = 0}};
+        // wasm_val_t arguments[0] = {};
 
-        int ret_val;
-        ret_val = results[0].of.i32;
-        printf("Native finished calling wasm function generate_float(), returned a "
-               "float value: %d\n",
-               ret_val + i);
+        // if (!wasm_runtime_call_wasm_a(exec_env, func, 1, results, 0, arguments))
+        // {
+        //     printf("call wasm function A1 failed. %s\n", wasm_runtime_get_exception(module_inst));
+        //     return -1;
+        // }
+
+        // printf("%d", results[0].of.i32);
+        // int ret_val;
+        // ret_val = results[0].of.i32;
+        // printf("Native finished calling wasm function generate_float(), returned a "
+        //    "float value: %d\n",
+        //    ret_val + i);
     }
     return EXIT_SUCCESS;
 }

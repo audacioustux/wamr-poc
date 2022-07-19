@@ -8,7 +8,11 @@
 static char *build_module_path(const char *module_name)
 {
     const char *module_search_path = ".";
+#if WASM_ENABLE_AOT != 0 && WASM_ENABLE_INTERP == 0
     const char *format = "%s/%s.aot";
+#else
+    const char *format = "%s/%s.wasm";
+#endif
     int sz = strlen(module_search_path) + strlen("/") + strlen(module_name) + strlen(".wasm") + 1;
     char *wasm_file_name = BH_MALLOC(sz);
     if (!wasm_file_name)
@@ -20,7 +24,7 @@ static char *build_module_path(const char *module_name)
     return wasm_file_name;
 }
 
-static bool module_reader_cb(const char *module_name, uint8 **p_buffer, uint32 *p_size)
+bool reader(const char *module_name, uint8 **p_buffer, uint32 *p_size)
 {
     char *wasm_file_path = build_module_path(module_name);
     if (!wasm_file_path)
@@ -28,10 +32,20 @@ static bool module_reader_cb(const char *module_name, uint8 **p_buffer, uint32 *
         return false;
     }
 
-    printf("- bh_read_file_to_buffer %s\n", wasm_file_path);
     *p_buffer = (uint8_t *)bh_read_file_to_buffer(wasm_file_path, p_size);
     BH_FREE(wasm_file_path);
     return *p_buffer != NULL;
+}
+
+void destroyer(uint8 *buffer, uint32 size)
+{
+    if (!buffer)
+    {
+        return;
+    }
+
+    BH_FREE(buffer);
+    buffer = NULL;
 }
 
 int main()
@@ -54,7 +68,7 @@ int main()
 
     uint8 *buffer = NULL;
     uint32 buffer_size = 0;
-    if (!module_reader_cb("hello-world", &buffer, &buffer_size))
+    if (!reader("hello-world", &buffer, &buffer_size))
     {
         return -1;
     }

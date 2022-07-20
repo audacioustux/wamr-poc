@@ -1,55 +1,23 @@
-# Copyright (C) 2019 Intel Corporation.  All rights reserved.
-# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+### use the latest cmake and CXX_STANDARD
+cmake_minimum_required(VERSION 3.18)
+set(CMAKE_CXX_STANDARD 23)
 
-cmake_minimum_required (VERSION 2.8...3.16)
 project(wasm-apps)
 
-message(CHECK_START "Detecting WABT")
-if(NOT (DEFINED WABT_DIR OR DEFINED CACHE{WABT_DIR}))
-  find_path(WABT_DIR
-    wabt
-    PATHS /opt
-    NO_DEFAULT_PATH
-    NO_CMAKE_FIND_ROOT_PATH
-  )
-  if(DEFINED WABT_DIR)
-    set(WABT_DIR ${WABT_DIR}/wabt)
-  endif()
-endif()
-if(WABT_DIR)
-  message(CHECK_PASS "found")
-else()
-  message(CHECK_FAIL "not found")
-endif()
+###
+find_program(WAT2WASM wat2wasm REQUIRED)
+###
+find_program(WASM2WAT wasm2wat REQUIRED)
+###
+find_program(WASM_OBJDUMP wasm-objdump REQUIRED)
 
-message(CHECK_START "Detecting WASM_OBJDUMP at ${WABT_DIR}")
-find_program(WASM_OBJDUMP
-  wasm-objdump
-  PATHS "${WABT_DIR}/bin"
-  NO_DEFAULT_PATH
-  NO_CMAKE_FIND_ROOT_PATH
-)
-if(WASM_OBJDUMP)
-  message(CHECK_PASS "found")
-else()
-  message(CHECK_FAIL "not found")
-endif()
+###
+set(WASI_SDK_PREFIX ${WASI_SDK_DIR})
+set(CMAKE_TOOLCHAIN_FILE ${WASI_TOOLCHAIN_FILE})
+set(CMAKE_SYSROOT ${WASI_SYS_ROOT})
 
-message(CHECK_START "Detecting WASM2WAT at ${WABT_DIR}")
-find_program(WASM2WAT
-  wasm2wat
-  PATHS "${WABT_DIR}/bin"
-  NO_DEFAULT_PATH
-  NO_CMAKE_FIND_ROOT_PATH
-)
-if(WASM2WAT)
-  message(CHECK_PASS "found")
-else()
-  message(CHECK_FAIL "not found")
-endif()
-
-function(COMPILE_WITH_CLANG SOURCE_FILE COMMAND)
-  get_filename_component(FILE_NAME ${SOURCE_FILE} NAME_WLE)
+function(COMPILE_C_TO_WASM SOURCE_FILE WASI_COMMAND_MODE)
+  cmake_path(GET SOURCE_FILE STEM FILE_NAME)
 
   set(WASM_MODULE ${FILE_NAME}.wasm)
 
@@ -58,7 +26,7 @@ function(COMPILE_WITH_CLANG SOURCE_FILE COMMAND)
   add_executable(${MAIN_TARGET_NAME} ${SOURCE_FILE})
   set_target_properties(${MAIN_TARGET_NAME} PROPERTIES OUTPUT_NAME ${WASM_MODULE})
 
-  if(${COMMAND})
+  if(WASI_COMMAND_MODE)
     message(STATUS "Generating ${WASM_MODULE} as COMMAND...")
   else()
     message(STATUS "Generating ${WASM_MODULE} as REACTOR...")
@@ -81,4 +49,4 @@ function(COMPILE_WITH_CLANG SOURCE_FILE COMMAND)
   endif()
 endfunction()
 
-compile_with_clang(hello-world.c OFF)
+COMPILE_C_TO_WASM(hello-world.c ON)

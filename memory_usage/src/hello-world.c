@@ -24,7 +24,7 @@ static char *build_module_path(const char *module_name)
     return wasm_file_name;
 }
 
-bool reader(const char *module_name, uint8 **p_buffer, uint32 *p_size)
+static bool reader(const char *module_name, uint8 **p_buffer, uint32 *p_size)
 {
     char *wasm_file_path = build_module_path(module_name);
     if (!wasm_file_path)

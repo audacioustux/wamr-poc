@@ -46,9 +46,9 @@ if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE Release)
 endif ()
 
-# set(WAMR_BUILD_INTERP 1)
+set(WAMR_BUILD_INTERP 1)
 # set(WAMR_BUILD_FAST_INTERP 1)
-set(WAMR_BUILD_AOT 1)
+# set(WAMR_BUILD_AOT 1)
 # set(WAMR_BUILD_JIT 1)
 set(WAMR_BUILD_LIBC_BUILTIN 1)
 set(WAMR_BUILD_LIBC_WASI 1)
@@ -111,7 +111,7 @@ set(WASI_SYS_ROOT ${WASI_SYS_ROOT}/wasi-sysroot)
 
 ###
 message(CHECK_START "Detecting WAMRC in ${WAMR_ROOT_DIR}/wamr-compiler/build/")
-if(${WAMR_BUILD_AOT} EQUAL 1)
+if(WAMR_BUILD_AOT EQUAL 1)
   find_program(WAMRC
     wamrc
     PATHS ${WAMR_ROOT_DIR}/wamr-compiler/build/
@@ -120,14 +120,22 @@ if(${WAMR_BUILD_AOT} EQUAL 1)
 endif()
 
 ###
-find_program(WAT2WASM wat2wasm REQUIRED)
-###
-find_program(WASM2WAT wasm2wat REQUIRED)
-###
-find_program(WASM_OBJDUMP wasm-objdump REQUIRED)
+set(TEST_EXAMPLES_C
+  hello-world
+)
+
+include(${SHARED_DIR}/utils/uncommon/shared_uncommon.cmake)
+foreach(EX ${TEST_EXAMPLES_C})
+  set(SRC ${CMAKE_CURRENT_LIST_DIR}/src/${EX}.c)
+
+  add_executable(${EX} ${SRC} ${UNCOMMON_SHARED_SOURCE})
+  target_include_directories(${EX} PRIVATE ${UNCOMMON_SHARED_DIR})
+  target_link_libraries(${EX} vmlib -lpthread -lm)
+endforeach()
 
 ### .c -> .wasm
 include(ExternalProject)
+
 ExternalProject_Add(WASM_MODULE
   SOURCE_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/wasm-apps
   UPDATE_COMMAND     ""
@@ -140,15 +148,8 @@ ExternalProject_Add(WASM_MODULE
   BUILD_COMMAND      ${CMAKE_COMMAND} --build .
   INSTALL_COMMAND    ${CMAKE_COMMAND} -E copy
                        ./hello-world.wasm ${CMAKE_CURRENT_SOURCE_DIR}/build/
+                       ./hello-world.wat ${CMAKE_CURRENT_SOURCE_DIR}/build/
 )
-
-###
-include_directories(${CMAKE_CURRENT_LIST_DIR}/src)
-include(${SHARED_DIR}/utils/uncommon/shared_uncommon.cmake)
-
-add_executable(${PROJECT_NAME} src/main.c ${UNCOMMON_SHARED_SOURCE})
-add_dependencies(${PROJECT_NAME} vmlib WASM_MODULE)
-target_link_libraries(${PROJECT_NAME} vmlib -lpthread -lm)
 
 ###
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -157,11 +158,11 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     REQUIRED
   )
 
-  foreach(EX ${EXAMPLES})
-    add_custom_target(${EX}_LEAK_TEST
-      COMMAND ${VALGRIND} --tool=memcheck --leak-check=yes ./${EX}
-      DEPENDS ${EX} ${EX}_WASM
-      VERBATIM
+  foreach(EX ${TEST_EXAMPLES_C})
+    add_custom_target(${EX}_MEMORY_USAGE
+      COMMAND ${VALGRIND} ./${EX}
+      # DEPENDS ${EX}
+      # VERBATIM
       COMMENT "run a leak check on ${EX}"
     )
   endforeach()

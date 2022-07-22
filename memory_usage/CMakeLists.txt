@@ -1,6 +1,6 @@
 ### use the latest cmake and CXX_STANDARD
 cmake_minimum_required(VERSION 3.18)
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_C_STANDARD 23)
 
 project(memory_usage)
 
@@ -46,14 +46,14 @@ if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE Release)
 endif ()
 
-set(WAMR_BUILD_INTERP 1)
+# set(WAMR_BUILD_INTERP 1)
 # set(WAMR_BUILD_FAST_INTERP 1)
-# set(WAMR_BUILD_AOT 1)
+set(WAMR_BUILD_AOT 1)
 # set(WAMR_BUILD_JIT 1)
 set(WAMR_BUILD_LIBC_BUILTIN 1)
 set(WAMR_BUILD_LIBC_WASI 1)
 # set(WAMR_BUILD_MULTI_MODULE 1)
-# set(WAMR_BUILD_SIMD 1)
+# set(WAMR_BUILD_SIMD 0)
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pie -fPIE")
 if (NOT (CMAKE_C_COMPILER MATCHES ".*clang.*" OR CMAKE_C_COMPILER_ID MATCHES ".*Clang"))
@@ -82,34 +82,21 @@ if(NOT (DEFINED WASI_SDK_DIR OR DEFINED CACHE{WASI_SDK_DIR}))
     wasi-sdk
     PATHS /opt
     NO_DEFAULT_PATH
-    NO_CMAKE_FIND_ROOT_PATH
     REQUIRED
   )
   set(WASI_SDK_DIR ${WASI_SDK_PARENT}/wasi-sdk)
 endif()
 
 ###
-message(CHECK_START "Detecting WASI_TOOLCHAIN_FILE at ${WASI_SDK_DIR}")
-find_file(WASI_TOOLCHAIN_FILE
-  wasi-sdk.cmake
-  PATHS "${WASI_SDK_DIR}/share/cmake"
+message(CHECK_START "Detecting wasi-sdk bundled clang at ${WASI_SDK_DIR}/bin")
+find_program(WASI_CLANG
+  clang
+  PATHS "${WASI_SDK_DIR}/bin"
   NO_DEFAULT_PATH
-  NO_CMAKE_FIND_ROOT_PATH
   REQUIRED
 )
 
-###
-message(CHECK_START "Detecting WASI_SYS_ROOT at ${WASI_SDK_DIR}")
-find_path(WASI_SYS_ROOT
-  wasi-sysroot
-  PATHS "${WASI_SDK_DIR}/share"
-  NO_DEFAULT_PATH
-  NO_CMAKE_FIND_ROOT_PATH
-  REQUIRED
-)
-set(WASI_SYS_ROOT ${WASI_SYS_ROOT}/wasi-sysroot)
-
-###
+### Detect wamrc
 message(CHECK_START "Detecting WAMRC in ${WAMR_ROOT_DIR}/wamr-compiler/build/")
 if(WAMR_BUILD_AOT EQUAL 1)
   find_program(WAMRC
@@ -118,6 +105,13 @@ if(WAMR_BUILD_AOT EQUAL 1)
     REQUIRED
   )
 endif()
+
+###
+find_program(WAT2WASM wat2wasm REQUIRED)
+###
+find_program(WASM2WAT wasm2wat REQUIRED)
+###
+find_program(WASM_OBJDUMP wasm-objdump REQUIRED)
 
 ###
 set(TEST_EXAMPLES_C
@@ -131,39 +125,50 @@ foreach(EX ${TEST_EXAMPLES_C})
   add_executable(${EX} ${SRC} ${UNCOMMON_SHARED_SOURCE})
   target_include_directories(${EX} PRIVATE ${UNCOMMON_SHARED_DIR})
   target_link_libraries(${EX} vmlib -lpthread -lm)
-endforeach()
 
-### .c -> .wasm
-include(ExternalProject)
+  set(WASM_SRC ${CMAKE_CURRENT_LIST_DIR}/wasm-apps/${EX}.c)
 
-ExternalProject_Add(WASM_MODULE
-  SOURCE_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/wasm-apps
-  UPDATE_COMMAND     ""
-  PATCH_COMMAND      ""
-  CONFIGURE_COMMAND  ${CMAKE_COMMAND}
-                       -DWASI_SDK_PREFIX=${WASI_SDK_DIR}
-                       -DCMAKE_TOOLCHAIN_FILE=${WASI_TOOLCHAIN_FILE}
-                       -DCMAKE_SYSROOT=${WASI_SYS_ROOT}
-                       -S ${CMAKE_CURRENT_SOURCE_DIR}/wasm-apps
-  BUILD_COMMAND      ${CMAKE_COMMAND} --build .
-  INSTALL_COMMAND    ${CMAKE_COMMAND} -E copy
-                       ./hello-world.wasm ${CMAKE_CURRENT_SOURCE_DIR}/build/
-                       ./hello-world.wat ${CMAKE_CURRENT_SOURCE_DIR}/build/
-)
+  if(${EX} STREQUAL "hello-world")
+    set(WASI_CLANG_ARGS 
+        -O3
+        -z stack-size=4096 -Wl,--initial-memory=65536
+        -Wl,--export=main,
+        -Wl,--export=__main_argc_argv,
+        -Wl,--export=__data_end,
+        -Wl,--export=__heap_base
+        -Wl,--strip-all,--no-entry
+        -Wl,--allow-undefined
+        -nostdlib)
+  endif(${EX} STREQUAL "hello-world")
 
-###
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  find_program(VALGRIND
-    valgrind
-    REQUIRED
+  add_custom_target(${EX}_WASM
+    COMMAND ${WASI_CLANG} ${WASM_SRC} -o ${PROJECT_BINARY_DIR}/${EX}.wasm ${WASI_CLANG_ARGS}
+    DEPENDS ${WASI_CLANG}
+    BYPRODUCTS ${PROJECT_BINARY_DIR}/${EX}.wasm
+    VERBATIM
+    COMMENT "generate a wasm file ${PROJECT_BINARY_DIR}/${EX}.wasm"
   )
+  add_dependencies(${EX} ${EX}_WASM)
 
-  foreach(EX ${TEST_EXAMPLES_C})
-    add_custom_target(${EX}_MEMORY_USAGE
-      COMMAND ${VALGRIND} ./${EX}
-      # DEPENDS ${EX}
-      # VERBATIM
-      COMMENT "run a leak check on ${EX}"
+  add_custom_target(${EX}_WAT
+    COMMAND ${WASM2WAT} --enable-all -o ${PROJECT_BINARY_DIR}/${EX}.wat
+      ${PROJECT_BINARY_DIR}/${EX}.wasm
+    DEPENDS ${EX}_WASM
+    BYPRODUCTS ${PROJECT_BINARY_DIR}/${EX}.wat
+    VERBATIM
+    COMMENT "generate a wat file ${PROJECT_BINARY_DIR}/${EX}.wat"
+  )
+  add_dependencies(${EX} ${EX}_WAT)
+
+  if(${WAMR_BUILD_AOT} EQUAL 1)
+    add_custom_target(${EX}_AOT
+      COMMAND ${WAMRC} -o ${PROJECT_BINARY_DIR}/${EX}.aot
+        ${PROJECT_BINARY_DIR}/${EX}.wasm
+      DEPENDS ${EX}_WASM
+      BYPRODUCTS ${PROJECT_BINARY_DIR}/${EX}.aot
+      VERBATIM
+      COMMENT "generate a aot file ${PROJECT_BINARY_DIR}/${EX}.aot"
     )
-  endforeach()
-endif()
+    add_dependencies(${EX} ${EX}_AOT)
+  endif()
+endforeach()

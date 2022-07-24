@@ -4,6 +4,7 @@
 #include "bh_read_file.h"
 #include "platform_common.h"
 #include "wasm_export.h"
+#include "wasm_memory.h"
 
 static char *build_module_path(const char *module_name)
 {
@@ -48,19 +49,28 @@ void destroyer(uint8 *buffer, uint32 size)
     buffer = NULL;
 }
 
+#define USE_GLOBAL_HEAP_BUF 0
+
+#if USE_GLOBAL_HEAP_BUF != 0
+static char global_heap_buf[1024 * 1024 * 1024] = {0};
+#endif
+
 int main()
 {
-    // static char global_heap_buf[1024 * 1024 * 1024];
+    RuntimeInitArgs init_args;
+    memset(&init_args, 0, sizeof(RuntimeInitArgs));
+#if USE_GLOBAL_HEAP_BUF != 0
+    init_args.mem_alloc_type = Alloc_With_Pool;
+    init_args.mem_alloc_option.pool.heap_buf = global_heap_buf;
+    init_args.mem_alloc_option.pool.heap_size = sizeof(global_heap_buf);
+#else
+    init_args.mem_alloc_type = Alloc_With_Allocator;
+    init_args.mem_alloc_option.allocator.malloc_func = malloc;
+    init_args.mem_alloc_option.allocator.realloc_func = realloc;
+    init_args.mem_alloc_option.allocator.free_func = free;
+#endif
 
-    // RuntimeInitArgs init_args;
-    // memset(&init_args, 0, sizeof(RuntimeInitArgs));
-
-    // init_args.mem_alloc_type = Alloc_With_Pool;
-    // init_args.mem_alloc_option.pool.heap_buf = global_heap_buf;
-    // init_args.mem_alloc_option.pool.heap_size = sizeof(global_heap_buf);
-
-    // if (!wasm_runtime_full_init(&init_args))
-    if (!wasm_runtime_init())
+    if (!wasm_runtime_full_init(&init_args))
     {
         printf("Init runtime environment failed.\n");
         return -1;
@@ -82,9 +92,9 @@ int main()
         return -1;
     }
 
-    for (int i = 0; i < 10000; i++)
+    for (int i = 0; i < 10; i++)
     {
-        const uint32 stack_size = 512, heap_size = 256;
+        const uint32 stack_size = 8192, heap_size = 65536;
         wasm_module_inst_t module_inst = wasm_runtime_instantiate(module, stack_size, heap_size, error_buffer, sizeof(error_buffer));
         if (!module_inst)
         {
@@ -102,6 +112,8 @@ int main()
         // static int app_argc;
         // static char **app_argv;
         // wasm_application_execute_main(module_inst, app_argc, app_argv);
+
+        wasm_runtime_dump_mem_consumption(exec_env);
 
         // wasm_function_inst_t func = wasm_runtime_lookup_function(module_inst, "dummy", NULL);
         // if (!func)

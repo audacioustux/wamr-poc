@@ -7,7 +7,7 @@ int main(int argc, char **argv)
 
     printf("Hello world!\n");
 
-    buf = malloc(1024);
+    buf = malloc(6);
     if (!buf)
     {
         printf("malloc buf failed\n");
@@ -16,7 +16,7 @@ int main(int argc, char **argv)
 
     printf("buf ptr: %p\n", buf);
 
-    snprintf(buf, 1024, "%s", "1234\n");
+    snprintf(buf, 6, "%s", "1234\n");
     printf("buf: %s", buf);
 
     free(buf);

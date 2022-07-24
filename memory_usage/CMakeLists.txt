@@ -46,7 +46,7 @@ if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE Release)
 endif ()
 
-# set(WAMR_BUILD_INTERP 1)
+set(WAMR_BUILD_INTERP 0)
 # set(WAMR_BUILD_FAST_INTERP 1)
 set(WAMR_BUILD_AOT 1)
 # set(WAMR_BUILD_JIT 1)
@@ -54,6 +54,7 @@ set(WAMR_BUILD_LIBC_BUILTIN 1)
 set(WAMR_BUILD_LIBC_WASI 1)
 # set(WAMR_BUILD_MULTI_MODULE 1)
 # set(WAMR_BUILD_SIMD 0)
+set(WAMR_BUILD_MEMORY_PROFILING 1)
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pie -fPIE")
 if (NOT (CMAKE_C_COMPILER MATCHES ".*clang.*" OR CMAKE_C_COMPILER_ID MATCHES ".*Clang"))
@@ -216,7 +217,7 @@ foreach(EX ${TEST_EXAMPLES_C})
 
   if(${EX_NAME} STREQUAL "hello-world")
     COMPILE_C_TO_WASM(hello_world SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/hello-world.c" TARGET "${PROJECT_BINARY_DIR}/hello-world.wasm"
-    CLANG_ARGS -O3 -z stack-size=4096 -nostdlib -Wl,--initial-memory=65536,--strip-all,--no-entry,--allow-undefined
+    CLANG_ARGS -O3 -z stack-size=8192 -Wl,--initial-memory=65536,--strip-all,--no-entry,--allow-undefined
     EXPORTS main __main_argc_argv __data_end __heap_base
     DUMP_WAT ${DUMP_AOT})
     add_dependencies(${EX_NAME} hello_world)

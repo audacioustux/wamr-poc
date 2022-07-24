@@ -121,6 +121,7 @@ macro(DUMP_WAT_MACRO)
     COMMAND ${WASM2WAT} --enable-all ${${prefix}_TARGET} -o ${WASM2WAT_TARGET}
     DEPENDS ${WASM2WAT}
     DEPENDS ${${prefix}_TARGET}
+    BYPRODUCTS ${WASM2WAT_TARGET}
     VERBATIM
   )
 endmacro()
@@ -132,6 +133,7 @@ macro(DUMP_AOT_MACRO)
     COMMAND ${WAMRC} -o ${WASM2AOT_TARGET} ${${prefix}_TARGET}
     DEPENDS ${WAMRC}
     DEPENDS ${${prefix}_TARGET}
+    BYPRODUCTS ${WASM2AOT_TARGET}
     VERBATIM
   )
 endmacro()

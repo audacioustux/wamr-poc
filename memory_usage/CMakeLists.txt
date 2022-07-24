@@ -114,61 +114,113 @@ find_program(WASM2WAT wasm2wat REQUIRED)
 find_program(WASM_OBJDUMP wasm-objdump REQUIRED)
 
 ###
+macro(DUMP_WAT_MACRO)
+  cmake_path(REPLACE_EXTENSION ${prefix}_TARGET ".wat" OUTPUT_VARIABLE WASM2WAT_TARGET)
+  add_custom_command(
+    TARGET ${NAME} POST_BUILD
+    COMMAND ${WASM2WAT} --enable-all ${${prefix}_TARGET} -o ${WASM2WAT_TARGET}
+    DEPENDS ${WASM2WAT}
+    DEPENDS ${${prefix}_TARGET}
+    VERBATIM
+  )
+endmacro()
+
+macro(DUMP_AOT_MACRO)
+  cmake_path(REPLACE_EXTENSION ${prefix}_TARGET ".aot" OUTPUT_VARIABLE WASM2AOT_TARGET)
+  add_custom_command(
+    TARGET ${NAME} POST_BUILD
+    COMMAND ${WAMRC} -o ${WASM2AOT_TARGET} ${${prefix}_TARGET}
+    DEPENDS ${WAMRC}
+    DEPENDS ${${prefix}_TARGET}
+    VERBATIM
+  )
+endmacro()
+
+function(COMPILE_C_TO_WASM NAME)
+  set(prefix C2WASM)
+  set(flags DUMP_AOT DUMP_WAT IS_REACTOR)
+  set(singleValues TARGET SOURCE)
+  set(multiValues CLANG_ARGS EXPORTS)
+
+  include(CMakeParseArguments)
+  cmake_parse_arguments(${prefix} "${flags}" "${singleValues}" "${multiValues}" ${ARGN})
+  if(DEFINED ${prefix}_UNPARSED_ARGUMENTS)
+    message(FATAL_ERROR "undefined arguments!")
+  endif()
+
+  foreach(EXPORT ${${prefix}_EXPORTS})
+    LIST(APPEND ${prefix}_CLANG_ARGS "-Wl,--export=${EXPORT}")
+  endforeach()
+  if(${IS_REACTOR})
+    LIST(APPEND ${prefix}_CLANG_ARGS "-mexec-model=reactor")
+  endif()
+
+  add_custom_target(${NAME}
+    COMMAND ${WASI_CLANG} ${${prefix}_SOURCE} -o ${${prefix}_TARGET} ${${prefix}_CLANG_ARGS}
+    DEPENDS ${WASI_CLANG}
+    BYPRODUCTS ${${prefix}_TARGET}
+    VERBATIM
+  )
+
+  if(${${prefix}_DUMP_AOT})
+    DUMP_AOT_MACRO()
+  endif()
+  if(${${prefix}_DUMP_WAT})
+    DUMP_WAT_MACRO()
+  endif()
+endfunction()
+
+function(COMPILE_WAT_TO_WASM NAME)
+  set(prefix WAT2WASM)
+  set(flags DUMP_AOT)
+  set(singleValues TARGET SOURCE)
+
+  include(CMakeParseArguments)
+  cmake_parse_arguments(${prefix} "${flags}" "${singleValues}" "${multiValues}" ${ARGN})
+  if(DEFINED ${prefix}_UNPARSED_ARGUMENTS)
+    message(FATAL_ERROR "undefined arguments!")
+  endif()
+
+  add_custom_target(${NAME}
+    COMMAND ${WAT2WASM} ${${prefix}_SOURCE} -o ${${prefix}_TARGET}
+    DEPENDS ${WAT2WASM}
+    BYPRODUCTS ${${prefix}_TARGET}
+    VERBATIM
+  )
+
+  if(${${prefix}_DUMP_AOT})
+    DUMP_AOT_MACRO()
+  endif()
+endfunction()
+
+###
+include(${SHARED_DIR}/utils/uncommon/shared_uncommon.cmake)
+
 set(TEST_EXAMPLES_C
-  hello-world
+  hello-world.c
 )
 
-include(${SHARED_DIR}/utils/uncommon/shared_uncommon.cmake)
 foreach(EX ${TEST_EXAMPLES_C})
-  set(SRC ${CMAKE_CURRENT_LIST_DIR}/src/${EX}.c)
+  set(SRC ${CMAKE_CURRENT_LIST_DIR}/src/${EX})
+  cmake_path(GET SRC STEM EX_NAME)
 
-  add_executable(${EX} ${SRC} ${UNCOMMON_SHARED_SOURCE})
-  target_include_directories(${EX} PRIVATE ${UNCOMMON_SHARED_DIR})
-  target_link_libraries(${EX} vmlib -lpthread -lm)
+  add_executable(${EX_NAME} ${SRC} ${UNCOMMON_SHARED_SOURCE})
+  target_include_directories(${EX_NAME} PRIVATE ${UNCOMMON_SHARED_DIR})
+  target_link_libraries(${EX_NAME} vmlib -lpthread -lm)
 
-  set(WASM_SRC ${CMAKE_CURRENT_LIST_DIR}/wasm-apps/${EX}.c)
+  if(${WAMR_BUILD_AOT})
+    set(DUMP_AOT DUMP_AOT)
+  endif()
 
-  if(${EX} STREQUAL "hello-world")
-    set(WASI_CLANG_ARGS 
-        -O3
-        -z stack-size=4096 -Wl,--initial-memory=65536
-        -Wl,--export=main,
-        -Wl,--export=__main_argc_argv,
-        -Wl,--export=__data_end,
-        -Wl,--export=__heap_base
-        -Wl,--strip-all,--no-entry
-        -Wl,--allow-undefined
-        -nostdlib)
-  endif(${EX} STREQUAL "hello-world")
+  if(${EX_NAME} STREQUAL "hello-world")
+    COMPILE_C_TO_WASM(hello_world SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/hello-world.c" TARGET "${PROJECT_BINARY_DIR}/hello-world.wasm"
+    CLANG_ARGS -O3 -z stack-size=4096 -nostdlib -Wl,--initial-memory=65536,--strip-all,--no-entry,--allow-undefined
+    EXPORTS main __main_argc_argv __data_end __heap_base
+    DUMP_WAT ${DUMP_AOT})
+    add_dependencies(${EX_NAME} hello_world)
 
-  add_custom_target(${EX}_WASM
-    COMMAND ${WASI_CLANG} ${WASM_SRC} -o ${PROJECT_BINARY_DIR}/${EX}.wasm ${WASI_CLANG_ARGS}
-    DEPENDS ${WASI_CLANG}
-    BYPRODUCTS ${PROJECT_BINARY_DIR}/${EX}.wasm
-    VERBATIM
-    COMMENT "generate a wasm file ${PROJECT_BINARY_DIR}/${EX}.wasm"
-  )
-  add_dependencies(${EX} ${EX}_WASM)
-
-  add_custom_target(${EX}_WAT
-    COMMAND ${WASM2WAT} --enable-all -o ${PROJECT_BINARY_DIR}/${EX}.wat
-      ${PROJECT_BINARY_DIR}/${EX}.wasm
-    DEPENDS ${EX}_WASM
-    BYPRODUCTS ${PROJECT_BINARY_DIR}/${EX}.wat
-    VERBATIM
-    COMMENT "generate a wat file ${PROJECT_BINARY_DIR}/${EX}.wat"
-  )
-  add_dependencies(${EX} ${EX}_WAT)
-
-  if(${WAMR_BUILD_AOT} EQUAL 1)
-    add_custom_target(${EX}_AOT
-      COMMAND ${WAMRC} -o ${PROJECT_BINARY_DIR}/${EX}.aot
-        ${PROJECT_BINARY_DIR}/${EX}.wasm
-      DEPENDS ${EX}_WASM
-      BYPRODUCTS ${PROJECT_BINARY_DIR}/${EX}.aot
-      VERBATIM
-      COMMENT "generate a aot file ${PROJECT_BINARY_DIR}/${EX}.aot"
-    )
-    add_dependencies(${EX} ${EX}_AOT)
+    COMPILE_WAT_TO_WASM(dummy_module SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/dummy-module.wat" TARGET "${PROJECT_BINARY_DIR}/dummy-module.wasm"
+    ${DUMP_AOT})
+    add_dependencies(${EX_NAME} dummy_module)
   endif()
 endforeach()

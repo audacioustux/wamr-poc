@@ -46,10 +46,10 @@ if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE Release)
 endif ()
 
-set(WAMR_BUILD_INTERP 0)
-# set(WAMR_BUILD_FAST_INTERP 1)
-set(WAMR_BUILD_AOT 1)
-# set(WAMR_BUILD_JIT 1)
+set(WAMR_BUILD_INTERP 1)
+set(WAMR_BUILD_FAST_INTERP 0)
+# set(WAMR_BUILD_AOT 1)
+set(WAMR_BUILD_JIT 1)
 set(WAMR_BUILD_LIBC_BUILTIN 1)
 set(WAMR_BUILD_LIBC_WASI 1)
 # set(WAMR_BUILD_MULTI_MODULE 1)
@@ -154,12 +154,12 @@ function(COMPILE_C_TO_WASM NAME)
   foreach(EXPORT ${${prefix}_EXPORTS})
     LIST(APPEND ${prefix}_CLANG_ARGS "-Wl,--export=${EXPORT}")
   endforeach()
-  if(${IS_REACTOR})
+  if(${${prefix}_IS_REACTOR})
     LIST(APPEND ${prefix}_CLANG_ARGS "-mexec-model=reactor")
   endif()
 
   add_custom_target(${NAME}
-    COMMAND ${WASI_CLANG} ${${prefix}_SOURCE} -o ${${prefix}_TARGET} ${${prefix}_CLANG_ARGS}
+    COMMAND ${WASI_CLANG} ${${prefix}_CLANG_ARGS} ${${prefix}_SOURCE} -o ${${prefix}_TARGET}
     DEPENDS ${WASI_CLANG}
     BYPRODUCTS ${${prefix}_TARGET}
     VERBATIM
@@ -217,13 +217,17 @@ foreach(EX ${TEST_EXAMPLES_C})
 
   if(${EX_NAME} STREQUAL "hello-world")
     COMPILE_C_TO_WASM(hello_world SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/hello-world.c" TARGET "${PROJECT_BINARY_DIR}/hello-world.wasm"
-    CLANG_ARGS -O3 -z stack-size=8192 -Wl,--initial-memory=65536,--strip-all,--no-entry,--allow-undefined
-    EXPORTS main __main_argc_argv __data_end __heap_base
-    DUMP_WAT ${DUMP_AOT})
+    CLANG_ARGS -O3 -z stack-size=8192 -Wl,--initial-memory=65536,--strip-all,--no-entry
+    # EXPORTS __data_end __heap_base run
+    DUMP_WAT IS_REACTOR ${DUMP_AOT})
     add_dependencies(${EX_NAME} hello_world)
 
     COMPILE_WAT_TO_WASM(dummy_module SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/dummy-module.wat" TARGET "${PROJECT_BINARY_DIR}/dummy-module.wasm"
     ${DUMP_AOT})
     add_dependencies(${EX_NAME} dummy_module)
+
+    COMPILE_WAT_TO_WASM(simple_global SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/simple-global.wat" TARGET "${PROJECT_BINARY_DIR}/simple-global.wasm"
+    ${DUMP_AOT})
+    add_dependencies(${EX_NAME} simple_global)
   endif()
 endforeach()

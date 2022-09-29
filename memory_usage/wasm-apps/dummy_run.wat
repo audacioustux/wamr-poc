@@ -1,0 +1,11 @@
+(module
+  (type (;0;) (func (result i32)))
+  (func (;0;) (type 0) (result i32)
+    i32.const 1)
+  (memory (;0;) 16)
+  (global (;0;) i32 (i32.const 1048576))
+  (global (;1;) i32 (i32.const 1048576))
+  (export "memory" (memory 0))
+  (export "__data_end" (global 0))
+  (export "__heap_base" (global 1))
+  (export "run" (func 0)))

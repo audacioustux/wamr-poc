@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(int argc, char **argv)
+__attribute__((export_name("_main"))) int entry()
 {
     char *buf;
 
@@ -20,5 +20,6 @@ int main(int argc, char **argv)
     printf("buf: %s", buf);
 
     free(buf);
+
     return 0;
 }

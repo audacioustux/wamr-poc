@@ -49,7 +49,7 @@ void destroyer(uint8 *buffer, uint32 size)
     buffer = NULL;
 }
 
-#define USE_GLOBAL_HEAP_BUF 0
+#define USE_GLOBAL_HEAP_BUF 1
 
 #if USE_GLOBAL_HEAP_BUF != 0
 static char global_heap_buf[1024 * 1024 * 1024] = {0};
@@ -78,7 +78,7 @@ int main()
 
     uint8 *buffer = NULL;
     uint32 buffer_size = 0;
-    if (!reader("hello-world", &buffer, &buffer_size))
+    if (!reader("test2.opt", &buffer, &buffer_size))
     {
         return -1;
     }
@@ -92,7 +92,7 @@ int main()
         return -1;
     }
 
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 1; i++)
     {
         const uint32 stack_size = 8192, heap_size = 65536;
         wasm_module_inst_t module_inst = wasm_runtime_instantiate(module, stack_size, heap_size, error_buffer, sizeof(error_buffer));
@@ -113,30 +113,30 @@ int main()
         // static char **app_argv;
         // wasm_application_execute_main(module_inst, app_argc, app_argv);
 
-        wasm_runtime_dump_mem_consumption(exec_env);
+        wasm_function_inst_t func = wasm_runtime_lookup_function(module_inst, "todos_create", NULL);
+        if (!func)
+        {
+            printf("The generate_float wasm function is not found.\n");
+            return -1;
+        }
 
-        // wasm_function_inst_t func = wasm_runtime_lookup_function(module_inst, "dummy", NULL);
-        // if (!func)
-        // {
-        // printf("The generate_float wasm function is not found.\n");
-        // return -1;
-        // }
-
+        wasm_val_t results[1] = {{.kind = WASM_I32, .of.i32 = 0}};
+        wasm_val_t arguments[0] = {};
         // wasm_val_t results[1] = {{.kind = WASM_I32, .of.i32 = 0}};
         // wasm_val_t arguments[0] = {};
 
         // if (!wasm_runtime_call_wasm_a(exec_env, func, 1, results, 0, arguments))
-        // {
-        //     printf("call wasm function A1 failed. %s\n", wasm_runtime_get_exception(module_inst));
-        //     return -1;
-        // }
+        if (!wasm_runtime_call_wasm_a(exec_env, func, 1, results, 0, arguments))
+        {
+            printf("call wasm function A1 failed. %s\n", wasm_runtime_get_exception(module_inst));
+            return -1;
+        }
 
-        // printf("%d", results[0].of.i32);
-        // int ret_val;
-        // ret_val = results[0].of.i32;
-        // printf("Native finished calling wasm function generate_float(), returned a "
-        //    "float value: %d\n",
-        //    ret_val + i);
+        int ret_val;
+        ret_val = results[0].of.i32;
+        printf("\n ret value: %d\n", ret_val + i);
+
+        wasm_runtime_dump_mem_consumption(exec_env);
     }
     return EXIT_SUCCESS;
 }

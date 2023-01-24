@@ -79,13 +79,14 @@ add_library(vmlib STATIC ${WAMR_RUNTIME_LIB_SOURCE})
 ###
 message(CHECK_START "Detecting WASI-SDK")
 if(NOT (DEFINED WASI_SDK_DIR OR DEFINED CACHE{WASI_SDK_DIR}))
-  find_path(WASI_SDK_PARENT
-    wasi-sdk
-    PATHS /opt
-    NO_DEFAULT_PATH
-    REQUIRED
-  )
-  set(WASI_SDK_DIR ${WASI_SDK_PARENT}/wasi-sdk)
+  # find_path(WASI_SDK_PARENT
+  #   wasi-sdk
+  #   PATHS /opt
+  #   NO_DEFAULT_PATH
+  #   REQUIRED
+  # )
+  # set(WASI_SDK_DIR ${WASI_SDK_PARENT}/wasi-sdk)
+  set(WASI_SDK_DIR ../wasi-sdk-19.0)
 endif()
 
 ###
@@ -200,7 +201,8 @@ endfunction()
 include(${SHARED_DIR}/utils/uncommon/shared_uncommon.cmake)
 
 set(TEST_EXAMPLES_C
-  hello-world.c
+  # hello-world.c
+  noop.c
 )
 
 foreach(EX ${TEST_EXAMPLES_C})
@@ -215,19 +217,19 @@ foreach(EX ${TEST_EXAMPLES_C})
     set(DUMP_AOT DUMP_AOT)
   endif()
 
-  if(${EX_NAME} STREQUAL "hello-world")
-    COMPILE_C_TO_WASM(hello_world SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/hello-world.c" TARGET "${PROJECT_BINARY_DIR}/hello-world.wasm"
-    CLANG_ARGS -O3 -z stack-size=8192 -Wl,--initial-memory=65536,--strip-all,--no-entry
-    # EXPORTS __data_end __heap_base run
-    DUMP_WAT IS_REACTOR ${DUMP_AOT})
-    add_dependencies(${EX_NAME} hello_world)
+  # if(${EX_NAME} STREQUAL "hello-world")
+  #   # COMPILE_C_TO_WASM(hello_world SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/hello-world.c" TARGET "${PROJECT_BINARY_DIR}/hello-world.wasm"
+  #   # CLANG_ARGS -O3 -z stack-size=8192 -Wl,--initial-memory=65536,--strip-all,--no-entry
+  #   # # EXPORTS __data_end __heap_base run
+  #   # DUMP_WAT IS_REACTOR ${DUMP_AOT})
+  #   # add_dependencies(${EX_NAME} hello_world)
 
-    COMPILE_WAT_TO_WASM(dummy_module SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/dummy-module.wat" TARGET "${PROJECT_BINARY_DIR}/dummy-module.wasm"
-    ${DUMP_AOT})
-    add_dependencies(${EX_NAME} dummy_module)
+  #   # COMPILE_WAT_TO_WASM(dummy_module SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/dummy-module.wat" TARGET "${PROJECT_BINARY_DIR}/dummy-module.wasm"
+  #   # ${DUMP_AOT})
+  #   # add_dependencies(${EX_NAME} dummy_module)
 
-    COMPILE_WAT_TO_WASM(simple_global SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/simple-global.wat" TARGET "${PROJECT_BINARY_DIR}/simple-global.wasm"
-    ${DUMP_AOT})
-    add_dependencies(${EX_NAME} simple_global)
-  endif()
+  #   # COMPILE_WAT_TO_WASM(simple_global SOURCE "${CMAKE_CURRENT_LIST_DIR}/wasm-apps/simple-global.wat" TARGET "${PROJECT_BINARY_DIR}/simple-global.wasm"
+  #   # ${DUMP_AOT})
+  #   # add_dependencies(${EX_NAME} simple_global)
+  # endif()
 endforeach()

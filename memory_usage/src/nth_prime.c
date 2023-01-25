@@ -78,7 +78,7 @@ int main()
 
     uint8 *buffer = NULL;
     uint32 buffer_size = 0;
-    if (!reader("noop", &buffer, &buffer_size))
+    if (!reader("nth_prime", &buffer, &buffer_size))
     {
         return -1;
     }
@@ -122,9 +122,9 @@ int main()
 
     wasm_val_t results[1] = {{.kind = WASM_I32}};
 
-    long long count = 1 * 1000 * 1000;
+    long long count = 10 * 1000;
 
-    int i = 0;
+    int i = 10000;
     for (long long j = 0; j < count; j++)
     {
         wasm_val_t arguments[1] = {{.kind = WASM_I32, .of.i32 = i}};
@@ -145,8 +145,8 @@ int main()
     TIME_NOW();
     long long start = ts.tv_sec * 1000000000LL + ts.tv_nsec;
 
-    i = 0;
-    for (long long j = 0; j < count; j++)
+    i = 10000;
+    for (long long j = 0; j < count + 1; j++)
     {
         wasm_val_t arguments[1] = {{.kind = WASM_I32, .of.i32 = i}};
         // wasm_val_t results[1] = {{.kind = WASM_I32, .of.i32 = 0}};

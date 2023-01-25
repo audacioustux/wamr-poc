@@ -78,7 +78,7 @@ int main()
 
     uint8 *buffer = NULL;
     uint32 buffer_size = 0;
-    if (!reader("noop", &buffer, &buffer_size))
+    if (!reader("slugify.opt", &buffer, &buffer_size))
     {
         return -1;
     }

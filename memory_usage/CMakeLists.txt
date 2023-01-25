@@ -46,10 +46,10 @@ if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE Release)
 endif ()
 
-set(WAMR_BUILD_INTERP 1)
-set(WAMR_BUILD_FAST_INTERP 1)
-# set(WAMR_BUILD_AOT 1)
-set(WAMR_BUILD_JIT 1)
+# set(WAMR_BUILD_INTERP 1)
+# set(WAMR_BUILD_FAST_INTERP 1)
+set(WAMR_BUILD_AOT 1)
+# set(WAMR_BUILD_JIT 1)
 set(WAMR_BUILD_LIBC_BUILTIN 1)
 set(WAMR_BUILD_LIBC_WASI 1)
 # set(WAMR_BUILD_MULTI_MODULE 1)
@@ -202,7 +202,9 @@ include(${SHARED_DIR}/utils/uncommon/shared_uncommon.cmake)
 
 set(TEST_EXAMPLES_C
   # hello-world.c
-  noop.c
+  # noop.c
+  nth_prime.c
+  # slugify.c
 )
 
 foreach(EX ${TEST_EXAMPLES_C})

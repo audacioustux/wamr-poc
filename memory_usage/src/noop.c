@@ -92,31 +92,31 @@ int main()
         return -1;
     }
 
-        const uint32 stack_size = 8192, heap_size = 65536;
-        wasm_module_inst_t module_inst = wasm_runtime_instantiate(module, stack_size, heap_size, error_buffer, sizeof(error_buffer));
-        if (!module_inst)
-        {
-            printf("Instantiate wasm module failed. error: %s\n", error_buffer);
-            return -1;
-        }
+    const uint32 stack_size = 8192, heap_size = 65536;
+    wasm_module_inst_t module_inst = wasm_runtime_instantiate(module, stack_size, heap_size, error_buffer, sizeof(error_buffer));
+    if (!module_inst)
+    {
+        printf("Instantiate wasm module failed. error: %s\n", error_buffer);
+        return -1;
+    }
 
-        wasm_exec_env_t exec_env = wasm_runtime_create_exec_env(module_inst, stack_size);
-        if (!exec_env)
-        {
-            printf("Create wasm execution environment failed.\n");
-            return -1;
-        }
+    wasm_exec_env_t exec_env = wasm_runtime_create_exec_env(module_inst, stack_size);
+    if (!exec_env)
+    {
+        printf("Create wasm execution environment failed.\n");
+        return -1;
+    }
 
-        // static int app_argc;
-        // static char **app_argv;
-        // wasm_application_execute_main(module_inst, app_argc, app_argv);
+    // static int app_argc;
+    // static char **app_argv;
+    // wasm_application_execute_main(module_inst, app_argc, app_argv);
 
-        wasm_function_inst_t func = wasm_runtime_lookup_function(module_inst, "foo", NULL);
-        if (!func)
-        {
-            printf("The generate_float wasm function is not found.\n");
-            return -1;
-        }
+    wasm_function_inst_t func = wasm_runtime_lookup_function(module_inst, "foo", NULL);
+    if (!func)
+    {
+        printf("The generate_float wasm function is not found.\n");
+        return -1;
+    }
 
 #define TIME_NOW() clock_gettime(CLOCK_MONOTONIC, &ts)
 
@@ -137,7 +137,7 @@ int main()
             printf("call wasm function A1 failed. %s\n", wasm_runtime_get_exception(module_inst));
             return -1;
         }
-        
+
         i = results[0].of.i32;
     }
 
@@ -157,7 +157,7 @@ int main()
             printf("call wasm function A1 failed. %s\n", wasm_runtime_get_exception(module_inst));
             return -1;
         }
-        
+
         i = results[0].of.i32;
     }
 

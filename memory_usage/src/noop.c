@@ -119,24 +119,13 @@ int main()
         }
 
 #define TIME_NOW() clock_gettime(CLOCK_MONOTONIC, &ts)
-    struct timespec ts;
-    TIME_NOW();
-    long long start = ts.tv_sec * 1000000000LL + ts.tv_nsec;
 
     wasm_val_t results[1] = {{.kind = WASM_I32}};
-    wasm_val_t arguments[1] = {{.kind = WASM_I32, .of.i32 = 0}};
-    // wasm_val_t results[1] = {{.kind = WASM_I32, .of.i32 = 0}};
-    // wasm_val_t arguments[0] = {};
 
-    // if (!wasm_runtime_call_wasm_a(exec_env, func, 1, results, 0, arguments))
-    if (!wasm_runtime_call_wasm_a(exec_env, func, 1, results, 1, arguments))
-    {
-        printf("call wasm function A1 failed. %s\n", wasm_runtime_get_exception(module_inst));
-        return -1;
-    }
+    long long count = 1 * 1000 * 1000;
 
-    int i = results[0].of.i32;
-    while (i < 100000000)
+    int i = 0;
+    for (long long j = 0; j < count; j++)
     {
         wasm_val_t arguments[1] = {{.kind = WASM_I32, .of.i32 = i}};
         // wasm_val_t results[1] = {{.kind = WASM_I32, .of.i32 = 0}};
@@ -148,13 +137,34 @@ int main()
             printf("call wasm function A1 failed. %s\n", wasm_runtime_get_exception(module_inst));
             return -1;
         }
+        
+        i = results[0].of.i32;
+    }
 
+    struct timespec ts;
+    TIME_NOW();
+    long long start = ts.tv_sec * 1000000000LL + ts.tv_nsec;
+
+    for (long long j = 0; j < count; j++)
+    {
+        wasm_val_t arguments[1] = {{.kind = WASM_I32, .of.i32 = i}};
+        // wasm_val_t results[1] = {{.kind = WASM_I32, .of.i32 = 0}};
+        // wasm_val_t arguments[0] = {};
+
+        // if (!wasm_runtime_call_wasm_a(exec_env, func, 1, results, 0, arguments))
+        if (!wasm_runtime_call_wasm_a(exec_env, func, 1, results, 1, arguments))
+        {
+            printf("call wasm function A1 failed. %s\n", wasm_runtime_get_exception(module_inst));
+            return -1;
+        }
+        
         i = results[0].of.i32;
     }
 
     TIME_NOW();
     long long end = ts.tv_sec * 1000000000LL + ts.tv_nsec;
     printf("time: %lld ns\n", end - start);
+    printf("per call: %lld ns\n", (end - start) / count);
 
     wasm_runtime_deinstantiate(module_inst);
     wasm_runtime_unload(module);
